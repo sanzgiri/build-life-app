@@ -24,7 +24,7 @@ export const handler = async (event, context) => {
     const store = getStore({
       name: 'build-life-progress',
       siteID: process.env.SITE_ID,
-      token: process.env.NETLIFY_TOKEN || process.env.NETLIFY_AUTH_TOKEN
+      token: process.env.NETLIFY_TOKEN || process.env.NETLIFY_AUTH_TOKEN || process.env.NETLIFY_BLOBS_TOKEN
     });
     await store.set(userId, JSON.stringify(progressData));
 

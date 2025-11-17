@@ -230,10 +230,18 @@ function getUserId() {
 async function initApp() {
   await loadData();
   
-  if (appState.user) {
-    appState.currentView = 'dashboard';
+  // Auto-create user if doesn't exist (skip welcome screen)
+  if (!appState.user) {
+    appState.user = {
+      name: 'User',
+      email: '',
+      programStartDate: new Date().toISOString(),
+      createdAt: new Date().toISOString()
+    };
+    await saveData();
   }
   
+  appState.currentView = 'dashboard';
   render();
 }
 
@@ -302,16 +310,12 @@ function navigateTo(view, data = {}) {
 function render() {
   const app = document.getElementById('app');
   
-  if (appState.currentView === 'welcome') {
-    app.innerHTML = renderWelcome();
-  } else {
-    app.innerHTML = `
-      ${renderHeader()}
-      <main class="main-content">
-        ${renderCurrentView()}
-      </main>
-    `;
-  }
+  app.innerHTML = `
+    ${renderHeader()}
+    <main class="main-content">
+      ${renderCurrentView()}
+    </main>
+  `;
   
   attachEventListeners();
 }
@@ -819,12 +823,6 @@ function renderSettings() {
 
 // Event Handlers
 function attachEventListeners() {
-  // Welcome form
-  const welcomeForm = document.getElementById('welcome-form');
-  if (welcomeForm) {
-    welcomeForm.addEventListener('submit', handleWelcomeSubmit);
-  }
-  
   // Profile form
   const profileForm = document.getElementById('profile-form');
   if (profileForm) {
@@ -861,23 +859,6 @@ function attachEventListeners() {
       }, 1000);
     });
   }
-}
-
-function handleWelcomeSubmit(e) {
-  e.preventDefault();
-  const name = document.getElementById('user-name').value;
-  const email = document.getElementById('user-email').value;
-  
-  appState.user = {
-    name,
-    email,
-    programStartDate: new Date().toISOString(),
-    createdAt: new Date().toISOString()
-  };
-  
-  saveData();
-  navigateTo('dashboard');
-  showToast(`Welcome, ${name}! Let's build the life you want.`, 'success');
 }
 
 function handleProfileSubmit(e) {
@@ -968,13 +949,19 @@ function handleAction(e) {
     case 'reset-program':
       if (confirm('Are you sure you want to reset all your data? This cannot be undone.')) {
         appState = {
-          currentView: 'welcome',
-          user: null,
+          currentView: 'dashboard',
+          user: {
+            name: 'User',
+            email: '',
+            programStartDate: new Date().toISOString(),
+            createdAt: new Date().toISOString()
+          },
           entries: {},
           selectedWeek: null,
           selectedDay: null,
           filterPillar: 'all'
         };
+        saveData();
         render();
         showToast('Program reset successfully', 'info');
       }
