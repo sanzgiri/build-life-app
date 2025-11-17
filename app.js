@@ -206,9 +206,29 @@ let appState = {
   filterPillar: 'all'
 };
 
+// Generate UUID for user identification
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// Get or create user ID
+function getUserId() {
+  let userId = localStorage.getItem('buildLifeUserId');
+  if (!userId) {
+    userId = generateUUID();
+    localStorage.setItem('buildLifeUserId', userId);
+    console.log('Created new userId:', userId);
+  }
+  return userId;
+}
+
 // Initialize App
-function initApp() {
-  loadData();
+async function initApp() {
+  await loadData();
   
   if (appState.user) {
     appState.currentView = 'dashboard';
@@ -217,19 +237,56 @@ function initApp() {
   render();
 }
 
-// Storage Functions - Using in-memory storage
-function loadData() {
-  // Data is maintained in appState object in memory
-  // For demo purposes, we can pre-populate with sample data
-  if (!appState.user) {
-    // No user yet, will be set on welcome
+// Storage Functions - Using Netlify Blobs via Functions
+async function loadData() {
+  const userId = getUserId();
+  console.log('Loading data for userId:', userId);
+  
+  try {
+    const response = await fetch(`/.netlify/functions/loadProgress?userId=${userId}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.progressData) {
+        // Restore state from loaded data
+        if (data.progressData.user) appState.user = data.progressData.user;
+        if (data.progressData.entries) appState.entries = data.progressData.entries;
+        if (data.progressData.filterPillar) appState.filterPillar = data.progressData.filterPillar;
+        console.log('Data loaded successfully from server');
+      }
+    } else {
+      console.log('No previous data found, starting fresh');
+    }
+  } catch (error) {
+    console.error('Error loading data:', error);
   }
 }
 
-function saveData() {
-  // Data is automatically saved in appState object
-  // In a real deployment, this would sync to a backend API
-  console.log('Data saved to memory');
+async function saveData() {
+  const userId = getUserId();
+  const dataToSave = {
+    user: appState.user,
+    entries: appState.entries,
+    filterPillar: appState.filterPillar,
+    lastSaved: new Date().toISOString()
+  };
+  
+  console.log('Saving data for userId:', userId);
+  
+  try {
+    const response = await fetch('/.netlify/functions/saveProgress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, progressData: dataToSave })
+    });
+    
+    if (response.ok) {
+      console.log('Data saved successfully to server');
+    } else {
+      console.error('Failed to save data');
+    }
+  } catch (error) {
+    console.error('Error saving data:', error);
+  }
 }
 
 // View Navigation

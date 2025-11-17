@@ -1,18 +1,65 @@
+import { getStore } from '@netlify/blobs';
 
-import { blobs } from '@netlify/blobs';
-
-export default async function handler(event, context) {
+export const handler = async (event, context) => {
   if (event.httpMethod !== 'GET') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return { 
+      statusCode: 405, 
+      body: JSON.stringify({ error: 'Method Not Allowed' })
+    };
   }
-  const userId = event.queryStringParameters.userId;
-  const key = `progress_${userId}`;
-  const data = await blobs.get(key);
-  if (data === null) {
-    return { statusCode: 404, body: 'No progress found.' };
+
+  try {
+    const userId = event.queryStringParameters?.userId;
+
+    if (!userId) {
+      return { 
+        statusCode: 400, 
+        body: JSON.stringify({ error: 'userId required' })
+      };
+    }
+
+    console.log('Loading progress for userId:', userId);
+
+    // For Functions, pass store name with explicit siteID/token fallback
+    const store = getStore({
+      name: 'build-life-progress',
+      siteID: process.env.SITE_ID,
+      token: process.env.NETLIFY_TOKEN || process.env.NETLIFY_AUTH_TOKEN
+    });
+    const data = await store.get(userId, { type: 'text' });
+
+    if (!data) {
+      console.log('No data found for userId:', userId);
+      return {
+        statusCode: 200,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+        body: JSON.stringify({ progressData: {} })
+      };
+    }
+
+    console.log('Data loaded successfully');
+
+    return {
+      statusCode: 200,
+      headers: { 
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache'
+      },
+      body: JSON.stringify({ progressData: JSON.parse(data) })
+    };
+  } catch (error) {
+    console.error('Load error:', error);
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        error: error.message,
+        stack: error.stack,
+        message: 'Failed to load progress'
+      })
+    };
   }
-  return {
-    statusCode: 200,
-    body: data,
-  };
-}
+};
